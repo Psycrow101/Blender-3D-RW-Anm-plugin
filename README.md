@@ -2,7 +2,7 @@
 
 This plugin for Blender 3D allows you to import and export RenderWare animations (`.anm`) for Sonic Heroes. Based on [Renderware-.anm-IO-Tool](https://github.com/Shadowth117/Renderware-.anm-IO-Tool).
 
-Poorly tested. Animation export may be incorrect due to broken keyframe sorting. Before exporting, make sure the keyframes contain the location and euler angle data for each axis. The first keyframes on the timeline must be set for each bone. 
+Poorly tested. Animation export may be incorrect due to broken keyframe sorting. To solve this problem, you can enable the "Create intermediate" option, but with this, the exported file will be larger in size.
 
 ## How to import animation
 

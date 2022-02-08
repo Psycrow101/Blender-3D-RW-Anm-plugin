@@ -1,6 +1,7 @@
 import bpy
 from bpy.props import (
         StringProperty,
+        BoolProperty,
         FloatProperty,
         )
 from bpy_extras.io_utils import (
@@ -11,7 +12,7 @@ from bpy_extras.io_utils import (
 bl_info = {
     "name": "Sonic Heroes Animation",
     "author": "Psycrow",
-    "version": (0, 0, 1),
+    "version": (0, 0, 2),
     "blender": (2, 81, 0),
     "location": "File > Import-Export",
     "description": "Import / Export Sonic Heroes Animation (.anm)",
@@ -66,13 +67,19 @@ class ExportSonicHeroesAnm(bpy.types.Operator, ExportHelper):
         default=30.0,
     )
 
+    create_intermediate: BoolProperty(
+        name="Create intermediate",
+        description="Create intermediate keyframes to fill the entire timeline",
+        default=False,
+    )
+
     def execute(self, context):
         from . import export_sh_anm
 
         keywords = self.as_keywords(ignore=("filter_glob",
                                             ))
 
-        return export_sh_anm.save(context, keywords['filepath'], keywords['fps'])
+        return export_sh_anm.save(context, keywords['filepath'], keywords['fps'], keywords['create_intermediate'])
 
 
 def menu_func_import(self, context):
