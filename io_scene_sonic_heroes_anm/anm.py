@@ -4,7 +4,6 @@ import struct
 from dataclasses import dataclass
 
 ANM_CHUNK_ID = 0x1b
-ANM_CHUNK_VERSION = 0x1400FFFF
 ANM_ACTION_VERSION = 0x100
 ANM_ACTION_PARENT_NONE_OFFSET = 0xFF30C9D8
 
@@ -34,6 +33,25 @@ def write_float32(fd, vals, en='<'):
     data = vals if hasattr(vals, '__len__') else (vals, )
     data = struct.pack('%s%df' % (en, len(data)), *data)
     fd.write(data)
+
+
+def unpack_rw_lib_id(version):
+    v = (version >> 14 & 0x3ff00) + 0x30000 | (version >> 16 & 0x3f)
+    bin_ver = v & 0x3f
+    min_rev = (v >> 8) & 0xf
+    maj_rev = (v >> 12) & 0xf
+    rw_ver = (v >> 16) & 0x7
+    return rw_ver, maj_rev, min_rev, bin_ver
+
+
+def pack_rw_lib_id(rw_ver, maj_rev, min_rev, bin_ver):
+    ver = ((rw_ver & 0x7) << 16) | ((maj_rev & 0xf) << 12) | ((min_rev & 0xf) << 8) | (bin_ver & 0x3f)
+    ver -= 0x30000
+    b = ver & 0xff
+    n = (ver >> 8) & 0xf
+    j = (ver >> 12) & 0xf
+    v = (ver >> 16) & 0xf
+    return 0xffff | (b << 16) | (n << 22) | (j << 26) | (v << 30)
 
 
 @dataclass

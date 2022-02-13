@@ -58,14 +58,18 @@ def load(context, filepath, *, fps):
     if not anm.chunks:
         return {'CANCELLED'}
 
+    animation_data = arm_obj.animation_data
+    if not animation_data:
+        animation_data = arm_obj.animation_data_create()
+
     bpy.ops.object.mode_set(mode='POSE')
 
     context.scene.frame_start = 0
-    act_prefix = path.basename(filepath)
-    for i, chunk in enumerate(anm.chunks):
+    for chunk in anm.chunks:
         act = create_action(arm_obj, chunk.action, fps)
-        act.name = '%s_%d' % (act_prefix, i)
-        arm_obj.animation_data_create().action = act
+        act.name = path.basename(filepath)
+        act['dragonff_rw_version'] = chunk.version
+        animation_data.action = act
         context.scene.frame_end = chunk.action.duration * fps
 
     bpy.ops.object.mode_set(mode='OBJECT')

@@ -1,7 +1,7 @@
 import bpy
 from mathutils import Matrix, Quaternion, Vector
 from collections import OrderedDict
-from . anm import Anm, AnmChunk, AnmAction, AnmKeyframe, ANM_CHUNK_ID, ANM_CHUNK_VERSION, ANM_ACTION_VERSION
+from . anm import Anm, AnmChunk, AnmAction, AnmKeyframe, ANM_CHUNK_ID, ANM_ACTION_VERSION
 
 
 def invalid_active_object(self, context):
@@ -114,19 +114,23 @@ def create_anm_action(context, arm_obj, act, fps, create_intermediate):
     return AnmAction(ANM_ACTION_VERSION, 0, duration / fps, keyframes)
 
 
-def save(context, filepath, fps, create_intermediate):
+def save(context, filepath, fps, export_version, create_intermediate):
     arm_obj = context.view_layer.objects.active
     if not arm_obj or type(arm_obj.data) != bpy.types.Armature:
         context.window_manager.popup_menu(invalid_active_object, title='Error', icon='ERROR')
         return {'CANCELLED'}
 
-    act = arm_obj.animation_data.action
+    act = None
+    animation_data = arm_obj.animation_data
+    if animation_data:
+        act = animation_data.action
+
     if not act:
         context.window_manager.popup_menu(missing_action, title='Error', icon='ERROR')
         return {'CANCELLED'}
 
     anm_act = create_anm_action(context, arm_obj, act, fps, create_intermediate)
-    anm = Anm([AnmChunk(ANM_CHUNK_ID, ANM_CHUNK_VERSION, anm_act)])
+    anm = Anm([AnmChunk(ANM_CHUNK_ID, export_version, anm_act)])
     anm.save(filepath)
 
     return {'FINISHED'}
