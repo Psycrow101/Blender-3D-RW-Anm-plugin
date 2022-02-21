@@ -33,11 +33,11 @@ def get_pose_mats(context, arm_obj, act, create_intermediate):
         
         for kp in curve.keyframe_points:
             time = kp.co[0]
-            if not frame_start <= time <= frame_end:
+            if not frame_start <= time < frame_end:
                 continue
             if time not in times_map:
-                times_map[time] = []
-            times_map[time].append(bone_id)
+                times_map[time] = set()
+            times_map[time].add(bone_id)
 
     if create_intermediate:
         times_map = {time: bone_ids for time in times_map}
@@ -51,9 +51,10 @@ def get_pose_mats(context, arm_obj, act, create_intermediate):
     for frame in range(frame_start, frame_end + 1):
         bone_mats_map[frame] = {}
         context.scene.frame_set(frame)
+        context.view_layer.update()
         for b in bone_ids:
-            pose_bone, arm_bone = arm_obj.pose.bones[b], arm_obj.data.bones[b]
-            mat = pose_bone.matrix
+            pose_bone = arm_obj.pose.bones[b]
+            mat = pose_bone.matrix.copy()
             if pose_bone.parent:
                 mat = pose_bone.parent.matrix.inverted_safe() @ mat
             bone_mats_map[frame][b] = mat
