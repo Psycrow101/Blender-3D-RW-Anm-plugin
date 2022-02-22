@@ -11,12 +11,12 @@ from bpy_extras.io_utils import (
 from . anm import unpack_rw_lib_id, pack_rw_lib_id
 
 bl_info = {
-    "name": "Sonic Heroes Animation",
+    "name": "RenderWare Animation",
     "author": "Psycrow",
     "version": (0, 1, 0),
     "blender": (2, 81, 0),
     "location": "File > Import-Export",
-    "description": "Import / Export Sonic Heroes Animation (.anm)",
+    "description": "Import / Export RenderWare Animation (.anm)",
     "warning": "",
     "wiki_url": "",
     "support": 'COMMUNITY',
@@ -25,15 +25,15 @@ bl_info = {
 
 if "bpy" in locals():
     import importlib
-    if "import_sh_anm" in locals():
-        importlib.reload(import_sh_anm)
-    if "export_sh_anm" in locals():
-        importlib.reload(export_sh_anm)
+    if "import_rw_anm" in locals():
+        importlib.reload(import_rw_anm)
+    if "export_rw_anm" in locals():
+        importlib.reload(export_rw_anm)
 
 
-class ImportSonicHeroesAnm(bpy.types.Operator, ImportHelper):
-    bl_idname = "import_scene.sonic_heroes_anm"
-    bl_label = "Import Sonic Heroes Animation"
+class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
+    bl_idname = "import_scene.renderware_anm"
+    bl_label = "Import RenderWare Animation"
     bl_options = {'PRESET', 'UNDO'}
 
     filter_glob: StringProperty(default="*.anm", options={'HIDDEN'})
@@ -46,17 +46,17 @@ class ImportSonicHeroesAnm(bpy.types.Operator, ImportHelper):
     )
 
     def execute(self, context):
-        from . import import_sh_anm
+        from . import import_rw_anm
 
         keywords = self.as_keywords(ignore=("filter_glob",
                                             ))
 
-        return import_sh_anm.load(context, **keywords)
+        return import_rw_anm.load(context, **keywords)
 
 
-class ExportSonicHeroesAnm(bpy.types.Operator, ExportHelper):
-    bl_idname = "export_scene.sonic_heroes_anm"
-    bl_label = "Export Sonic Heroes Animation"
+class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
+    bl_idname = "export_scene.renderware_anm"
+    bl_label = "Export RenderWare Animation"
     bl_options = {'PRESET'}
 
     filter_glob: StringProperty(default="*.anm", options={'HIDDEN'})
@@ -88,13 +88,13 @@ class ExportSonicHeroesAnm(bpy.types.Operator, ExportHelper):
         col.prop(self, "fps")
 
     def execute(self, context):
-        from . import export_sh_anm
+        from . import export_rw_anm
 
         if not self.verify_rw_version():
             self.report({"ERROR_INVALID_INPUT"}, "Invalid RW Version")
             return {'CANCELLED'}
 
-        return export_sh_anm.save(context, self.filepath, self.fps, self.get_selected_rw_version())
+        return export_rw_anm.save(context, self.filepath, self.fps, self.get_selected_rw_version())
 
     def invoke(self, context, event):
         arm_obj = context.view_layer.objects.active
@@ -125,18 +125,18 @@ class ExportSonicHeroesAnm(bpy.types.Operator, ExportHelper):
 
 
 def menu_func_import(self, context):
-    self.layout.operator(ImportSonicHeroesAnm.bl_idname,
-                         text="Sonic Heroes Animation (.anm)")
+    self.layout.operator(ImportRenderWareAnm.bl_idname,
+                         text="RenderWare Animation (.anm)")
 
 
 def menu_func_export(self, context):
-    self.layout.operator(ExportSonicHeroesAnm.bl_idname,
-                         text="Sonic Heroes Animation (.anm)")
+    self.layout.operator(ExportRenderWareAnm.bl_idname,
+                         text="RenderWare Animation (.anm)")
 
 
 classes = (
-    ImportSonicHeroesAnm,
-    ExportSonicHeroesAnm,
+    ImportRenderWareAnm,
+    ExportRenderWareAnm,
 )
 
 

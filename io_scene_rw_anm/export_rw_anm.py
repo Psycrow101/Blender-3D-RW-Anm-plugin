@@ -29,7 +29,7 @@ def get_pose_mats(context, arm_obj, act):
         bone_id = arm_obj.data.bones.find(bone_name)
         if bone_id not in bone_ids:
             continue
-        
+
         for kp in curve.keyframe_points:
             time = kp.co[0]
             if not frame_start <= time < frame_end:
