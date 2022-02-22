@@ -1,6 +1,5 @@
 import bpy
 from mathutils import Matrix, Quaternion, Vector
-from collections import OrderedDict
 from . anm import Anm, AnmChunk, AnmAction, AnmKeyframe, ANM_CHUNK_ID, ANM_ACTION_VERSION
 
 
@@ -16,7 +15,7 @@ def is_bone_taged(bone):
     return bone.get('bone_id') is not None
 
 
-def get_pose_mats(context, arm_obj, act, create_intermediate):
+def get_pose_mats(context, arm_obj, act):
     frame_start = context.scene.frame_start
     frame_end = context.scene.frame_end + 1
 
@@ -39,11 +38,8 @@ def get_pose_mats(context, arm_obj, act, create_intermediate):
                 times_map[time] = set()
             times_map[time].add(bone_id)
 
-    if create_intermediate:
-        times_map = {time: bone_ids for time in times_map}
-    else:
-        times_map[min(times_map)] = bone_ids
-        times_map[max(times_map)] = bone_ids
+    times_map[min(times_map)] = bone_ids
+    times_map[max(times_map)] = bone_ids
 
     old_frame = context.scene.frame_current
 
@@ -61,50 +57,40 @@ def get_pose_mats(context, arm_obj, act, create_intermediate):
 
     context.scene.frame_set(old_frame)
 
-    pose_mats = {}
+    pose_mats = []
     for time, bids in times_map.items():
-        pose_mats[time] = {}
-        for bone_id in sorted(bids):
+        for bone_id in bids:
             prev_time, next_time = int(time), int(time + 1)
             prev_mat, next_mat = bone_mats_map[prev_time][bone_id], bone_mats_map[next_time][bone_id]
-            pose_mats[time][bone_id] = prev_mat.lerp(next_mat, time - prev_time)
+            pose_mats.append((bone_id, time, prev_mat.lerp(next_mat, time - prev_time)))
 
     return pose_mats
 
 
 def sort_pose_mats(pose_mats):
-    def find_next_time(c_bone_id, c_bone_time):
-        for t, m in ordered_pose_mats.items():
-            if t >= c_bone_time and c_bone_id in m.keys():
-                return t
-        return None
+    sorted_pose_mats_s1 = sorted(pose_mats)
+    curr_bone_id = sorted_pose_mats_s1[0][0]
+    prev_time = sorted_pose_mats_s1[0][1] - 1.0
 
-    ordered_pose_mats = OrderedDict(sorted(pose_mats.items()))
-    sorted_pose_mats = []
+    sorted_pose_mats_s2 = []
+    for bone_id, time, pose_mat in sorted_pose_mats_s1:
+        if bone_id != curr_bone_id:
+            curr_bone_id = bone_id
+            prev_time = time - 1.0
 
-    times_set, bone_ids_set = set(), set()
-    for time, mats in ordered_pose_mats.items():
-        times_set.add(time)
-        for bone_id in mats.keys():
-            bone_ids_set.add(bone_id)
+        sorted_pose_mats_s2.append((prev_time, bone_id, time, pose_mat))
+        prev_time = time
 
-    for time in times_set:
-        for bone_id in bone_ids_set:
-            next_time = find_next_time(bone_id, time)
-            if next_time is None:
-                continue
-            sorted_pose_mats.append((next_time, bone_id, ordered_pose_mats[next_time][bone_id]))
-            del ordered_pose_mats[next_time][bone_id]
-
+    sorted_pose_mats = [(bone_id, time, pose_mat) for _, bone_id, time, pose_mat in sorted(sorted_pose_mats_s2)]
     return sorted_pose_mats
 
 
-def create_anm_action(context, arm_obj, act, fps, create_intermediate):
+def create_anm_action(context, arm_obj, act, fps):
     keyframes = []
-    sorted_pose_mats = sort_pose_mats(get_pose_mats(context, arm_obj, act, create_intermediate))
+    sorted_pose_mats = sort_pose_mats(get_pose_mats(context, arm_obj, act))
     duration = 0.0
 
-    for time, bone_id, pose_mat in sorted_pose_mats:
+    for bone_id, time, pose_mat in sorted_pose_mats:
         bone = arm_obj.pose.bones[bone_id]
         pos = pose_mat.to_translation()
         rot = pose_mat.to_quaternion()
@@ -115,7 +101,7 @@ def create_anm_action(context, arm_obj, act, fps, create_intermediate):
     return AnmAction(ANM_ACTION_VERSION, 0, duration / fps, keyframes)
 
 
-def save(context, filepath, fps, export_version, create_intermediate):
+def save(context, filepath, fps, export_version):
     arm_obj = context.view_layer.objects.active
     if not arm_obj or type(arm_obj.data) != bpy.types.Armature:
         context.window_manager.popup_menu(invalid_active_object, title='Error', icon='ERROR')
@@ -130,7 +116,7 @@ def save(context, filepath, fps, export_version, create_intermediate):
         context.window_manager.popup_menu(missing_action, title='Error', icon='ERROR')
         return {'CANCELLED'}
 
-    anm_act = create_anm_action(context, arm_obj, act, fps, create_intermediate)
+    anm_act = create_anm_action(context, arm_obj, act, fps)
     anm = Anm([AnmChunk(ANM_CHUNK_ID, export_version, anm_act)])
     anm.save(filepath)
 

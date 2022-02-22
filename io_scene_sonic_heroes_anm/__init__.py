@@ -13,7 +13,7 @@ from . anm import unpack_rw_lib_id, pack_rw_lib_id
 bl_info = {
     "name": "Sonic Heroes Animation",
     "author": "Psycrow",
-    "version": (0, 0, 3),
+    "version": (0, 1, 0),
     "blender": (2, 81, 0),
     "location": "File > Import-Export",
     "description": "Import / Export Sonic Heroes Animation (.anm)",
@@ -74,12 +74,6 @@ class ExportSonicHeroesAnm(bpy.types.Operator, ExportHelper):
         default=30.0,
     )
 
-    create_intermediate: BoolProperty(
-        name="Create intermediate",
-        description="Create intermediate keyframes to fill the entire timeline",
-        default=False,
-    )
-
     def draw(self, context):
         layout = self.layout
         col = layout.column()
@@ -92,7 +86,6 @@ class ExportSonicHeroesAnm(bpy.types.Operator, ExportHelper):
         col = layout.column()
         col.alignment = 'CENTER'
         col.prop(self, "fps")
-        col.prop(self, "create_intermediate")
 
     def execute(self, context):
         from . import export_sh_anm
@@ -101,7 +94,7 @@ class ExportSonicHeroesAnm(bpy.types.Operator, ExportHelper):
             self.report({"ERROR_INVALID_INPUT"}, "Invalid RW Version")
             return {'CANCELLED'}
 
-        return export_sh_anm.save(context, self.filepath, self.fps, self.get_selected_rw_version(), self.create_intermediate)
+        return export_sh_anm.save(context, self.filepath, self.fps, self.get_selected_rw_version())
 
     def invoke(self, context, event):
         arm_obj = context.view_layer.objects.active
@@ -138,7 +131,7 @@ def menu_func_import(self, context):
 
 def menu_func_export(self, context):
     self.layout.operator(ExportSonicHeroesAnm.bl_idname,
-                         text="Sonic Heroes Animation [unstable] (.anm)")
+                         text="Sonic Heroes Animation (.anm)")
 
 
 classes = (
