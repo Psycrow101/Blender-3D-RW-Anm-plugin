@@ -70,7 +70,7 @@ def load(context, filepath, *, fps):
         act.name = path.basename(filepath)
         act['dragonff_rw_version'] = chunk.version
         animation_data.action = act
-        context.scene.frame_end = chunk.action.duration * fps
+        context.scene.frame_end = int(chunk.action.duration * fps)
 
     bpy.ops.object.mode_set(mode='OBJECT')
 

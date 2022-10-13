@@ -1,5 +1,4 @@
 import bpy
-from mathutils import Matrix, Quaternion, Vector
 from . anm import Anm, AnmChunk, AnmAction, AnmKeyframe, ANM_CHUNK_ID, ANM_ACTION_VERSION
 
 
