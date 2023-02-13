@@ -8,8 +8,18 @@ ANM_ACTION_VERSION = 0x100
 ANM_ACTION_PARENT_NONE_OFFSET = 0xFF30C9D8
 
 
+def decode_float16(value):
+    sign = -1.0 if (value >> 15) else 1.0
+    if (value & 0x7FFF) == 0:
+        return sign * 0.0
+    exponent = ((value >> 11) & 15) - 15
+    mantissa = (value & 0x07FF) / 0x800 + 1.0
+    return sign * mantissa * 2**exponent
+
+
 def read_float16(fd, num=1, en='<'):
-    res = struct.unpack('%s%de' % (en, num), fd.read(2 * num))
+    res = struct.unpack('%s%dH' % (en, num), fd.read(2 * num))
+    res = tuple(map(decode_float16, res))
     return res if num > 1 else res[0]
 
 
