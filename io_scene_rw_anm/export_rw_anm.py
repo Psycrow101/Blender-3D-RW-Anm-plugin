@@ -10,6 +10,10 @@ def missing_action(self, context):
     self.layout.label(text='No action for active armature. Nothing to export')
 
 
+def no_tagged_bones(self, context):
+    self.layout.label(text='No tagged bones in armature. To export animation, you must first import the dff model')
+
+
 def is_bone_taged(bone):
     return bone.get('bone_id') is not None
 
@@ -113,6 +117,10 @@ def save(context, filepath, fps, export_version):
 
     if not act:
         context.window_manager.popup_menu(missing_action, title='Error', icon='ERROR')
+        return {'CANCELLED'}
+
+    if not any(is_bone_taged(bone) for bone in arm_obj.data.bones):
+        context.window_manager.popup_menu(no_tagged_bones, title='Error', icon='ERROR')
         return {'CANCELLED'}
 
     anm_act = create_anm_action(context, arm_obj, act, fps)
