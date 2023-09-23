@@ -37,6 +37,8 @@ def create_action(arm_obj, anm_act, fps):
         bone.rotation_mode = 'QUATERNION'
 
     for kf in anm_act.keyframes:
+        if kf.bone_id >= len(arm_obj.pose.bones):
+            continue
         bone = arm_obj.pose.bones[kf.bone_id]
         mat = Matrix.Translation(kf.pos) @ kf.rot.to_matrix().to_4x4()
         if bone.parent:
@@ -48,7 +50,7 @@ def create_action(arm_obj, anm_act, fps):
     return act
 
 
-def load(context, filepath, *, fps):
+def load(context, filepath, fps):
     arm_obj = context.view_layer.objects.active
     if not arm_obj or type(arm_obj.data) != bpy.types.Armature:
         context.window_manager.popup_menu(invalid_active_object, title='Error', icon='ERROR')
