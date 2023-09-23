@@ -101,7 +101,7 @@ class AnmAction:
             rot = Quaternion((rot[3], rot[0], rot[1], rot[2]))
             prev_frame_off = read_uint32(fd)
 
-            if time == 0.0:
+            if prev_frame_off & 0x3F000000:
                 bone_id += 1
             else:
                 prev_kf_id = frame_offs.index(prev_frame_off)
