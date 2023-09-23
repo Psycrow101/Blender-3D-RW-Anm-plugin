@@ -54,7 +54,7 @@ class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
         files_dir = Path(self.filepath)
         for selection in self.files:
             file_path = Path(files_dir.parent, selection.name)
-            if file_path.suffix == self.filename_ext:
+            if file_path.suffix.lower() == self.filename_ext:
                 import_rw_anm.load(context, file_path, self.fps)
         return {'FINISHED'}
 
