@@ -20,7 +20,7 @@ def set_keyframe(curves, frame, values):
 def create_action(arm_obj, anm_act, fps):
     act = bpy.data.actions.new('action')
     curves_loc, curves_rot = [], []
-    loc_mats = {}
+    loc_mats, prev_rots = {}, {}
 
     for pose_bone in arm_obj.pose.bones:
         g = act.groups.new(name=pose_bone.name)
@@ -44,6 +44,7 @@ def create_action(arm_obj, anm_act, fps):
         if bone.parent:
             loc_mat = bone.parent.matrix_local.inverted_safe() @ loc_mat
         loc_mats[pose_bone] = loc_mat
+        prev_rots[pose_bone] = None
 
     for kf in anm_act.keyframes:
         if kf.bone_id >= len(arm_obj.pose.bones):
@@ -55,8 +56,18 @@ def create_action(arm_obj, anm_act, fps):
         loc_pos = loc_mat.to_translation()
         loc_rot = loc_mat.to_quaternion()
 
+        rot = loc_rot.rotation_difference(kf.rot)
+
+        prev_rot = prev_rots[pose_bone]
+        if prev_rot:
+            alt_rot = rot.copy()
+            alt_rot.negate()
+            if rot.rotation_difference(prev_rot).angle > alt_rot.rotation_difference(prev_rot).angle:
+                rot = alt_rot
+        prev_rots[pose_bone] = rot
+
         set_keyframe(curves_loc[kf.bone_id], kf.time * fps, kf.pos - loc_pos)
-        set_keyframe(curves_rot[kf.bone_id], kf.time * fps, loc_rot.rotation_difference(kf.rot))
+        set_keyframe(curves_rot[kf.bone_id], kf.time * fps, rot)
 
     return act
 
