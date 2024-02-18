@@ -1,6 +1,6 @@
+import struct
 from mathutils import Quaternion, Vector
 from os import SEEK_SET, SEEK_CUR, SEEK_END
-import struct
 from dataclasses import dataclass
 
 ANM_CHUNK_ID = 0x1b

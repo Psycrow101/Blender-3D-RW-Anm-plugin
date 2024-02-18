@@ -1,4 +1,6 @@
 import bpy
+from dataclasses import dataclass
+from mathutils import Quaternion, Vector
 from . anm import Anm, AnmChunk, AnmAction, AnmKeyframe, ANM_CHUNK_ID, ANM_ACTION_VERSION
 
 
@@ -18,7 +20,16 @@ def is_bone_taged(bone):
     return bone.get('bone_id') is not None
 
 
-def get_pose_mats(context, arm_obj, act):
+@dataclass
+class PoseBoneTransform:
+    pos: Vector
+    rot: Quaternion
+
+    def lerp(self, trans, factor):
+        return PoseBoneTransform(self.pos.lerp(trans.pos, factor), self.rot.slerp(trans.rot, factor))
+
+
+def get_pose_transforms(context, arm_obj, act):
     frame_start = context.scene.frame_start
     frame_end = context.scene.frame_end + 1
 
@@ -46,58 +57,69 @@ def get_pose_mats(context, arm_obj, act):
 
     old_frame = context.scene.frame_current
 
-    bone_mats_map = {}
+    bone_transforms_map = {}
     for frame in range(frame_start, frame_end + 1):
-        bone_mats_map[frame] = {}
+        bone_transforms_map[frame] = {}
         context.scene.frame_set(frame)
         context.view_layer.update()
         for b in bone_ids:
             pose_bone = arm_obj.pose.bones[b]
-            mat = pose_bone.matrix.copy()
-            if pose_bone.parent:
-                mat = pose_bone.parent.matrix.inverted_safe() @ mat
-            bone_mats_map[frame][b] = mat
+            pos = pose_bone.location.copy()
+            if pose_bone.rotation_mode == 'QUATERNION':
+                rot = pose_bone.rotation_quaternion.copy()
+            else:
+                rot = pose_bone.rotation_euler.to_quaternion()
+            transform = PoseBoneTransform(pos, rot)
+            bone_transforms_map[frame][b] = transform
 
     context.scene.frame_set(old_frame)
 
-    pose_mats = []
+    pose_transforms = []
     for time, bids in times_map.items():
         for bone_id in bids:
             prev_time, next_time = int(time), int(time + 1)
-            prev_mat, next_mat = bone_mats_map[prev_time][bone_id], bone_mats_map[next_time][bone_id]
-            pose_mats.append((bone_id, time, prev_mat.lerp(next_mat, time - prev_time)))
+            prev_transform = bone_transforms_map[prev_time][bone_id]
+            next_transform = bone_transforms_map[next_time][bone_id]
+            pose_transforms.append((bone_id, time, prev_transform.lerp(next_transform, time - prev_time)))
 
-    return pose_mats
+    return pose_transforms
 
 
-def sort_pose_mats(pose_mats):
-    sorted_pose_mats_s1 = sorted(pose_mats)
-    curr_bone_id = sorted_pose_mats_s1[0][0]
-    prev_time = sorted_pose_mats_s1[0][1] - 1.0
+def sort_pose_transforms(pose_transforms):
+    sorted_pose_transforms_s1 = sorted(pose_transforms)
+    curr_bone_id = sorted_pose_transforms_s1[0][0]
+    prev_time = sorted_pose_transforms_s1[0][1] - 1.0
 
-    sorted_pose_mats_s2 = []
-    for bone_id, time, pose_mat in sorted_pose_mats_s1:
+    sorted_pose_transforms_s2 = []
+    for bone_id, time, pose_transform in sorted_pose_transforms_s1:
         if bone_id != curr_bone_id:
             curr_bone_id = bone_id
             prev_time = time - 1.0
 
-        sorted_pose_mats_s2.append((prev_time, bone_id, time, pose_mat))
+        sorted_pose_transforms_s2.append((prev_time, bone_id, time, pose_transform))
         prev_time = time
 
-    sorted_pose_mats = [(bone_id, time, pose_mat) for _, bone_id, time, pose_mat in sorted(sorted_pose_mats_s2)]
-    return sorted_pose_mats
+    sorted_pose_transforms = [(bone_id, time, pose_transform) for _, bone_id, time, pose_transform in sorted(sorted_pose_transforms_s2)]
+    return sorted_pose_transforms
 
 
 def create_anm_action(context, arm_obj, act, fps):
     keyframes = []
-    sorted_pose_mats = sort_pose_mats(get_pose_mats(context, arm_obj, act))
+    sorted_pose_transforms = sort_pose_transforms(get_pose_transforms(context, arm_obj, act))
     duration = 0.0
 
-    for bone_id, time, pose_mat in sorted_pose_mats:
-        bone = arm_obj.pose.bones[bone_id]
-        pos = pose_mat.to_translation()
-        rot = pose_mat.to_quaternion()
-        keyframes.append(AnmKeyframe(time / fps, bone_id, pos, rot))
+    for bone_id, time, pose_transform in sorted_pose_transforms:
+        bone = arm_obj.data.bones[bone_id]
+
+        loc_mat = bone.matrix_local.copy()
+        if bone.parent:
+            loc_mat = bone.parent.matrix_local.inverted_safe() @ loc_mat
+
+        kf_pos, kf_rot = pose_transform.pos, pose_transform.rot
+        kf_pos += loc_mat.to_translation()
+        kf_rot = loc_mat.inverted_safe().to_quaternion().rotation_difference(kf_rot)
+
+        keyframes.append(AnmKeyframe(time / fps, bone_id, kf_pos, kf_rot))
         if time > duration:
             duration = time
 
