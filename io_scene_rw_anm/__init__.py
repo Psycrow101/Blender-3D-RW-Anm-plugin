@@ -14,7 +14,7 @@ from . anm import unpack_rw_lib_id, pack_rw_lib_id
 bl_info = {
     "name": "RenderWare Animation",
     "author": "Psycrow",
-    "version": (0, 1, 4),
+    "version": (0, 2, 0),
     "blender": (2, 81, 0),
     "location": "File > Import-Export",
     "description": "Import / Export RenderWare Animation (.anm)",

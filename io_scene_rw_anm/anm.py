@@ -102,7 +102,7 @@ class AnmAction:
             prev_frame_off = read_uint32(fd)
 
             if prev_frame_off & 0x3F000000:
-                bone_id += 1
+                bone_id = bone_id + 1 if time == 0.0 else 0
             else:
                 prev_kf_id = frame_offs.index(prev_frame_off)
                 bone_id = keyframes[prev_kf_id].bone_id
@@ -130,7 +130,7 @@ class AnmAction:
             write_float32(fd, (kf.rot[1], kf.rot[2], kf.rot[3], kf.rot[0]))
             write_float32(fd, kf.pos)
 
-            if kf.time == 0.0:
+            if kf.bone_id not in prev_frame_offs:
                 write_uint32(fd, ANM_ACTION_PARENT_NONE_OFFSET)
             else:
                 write_uint32(fd, prev_frame_offs[kf.bone_id])
