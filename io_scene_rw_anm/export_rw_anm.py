@@ -107,9 +107,11 @@ def create_anm_action(context, arm_obj, act, fps):
     keyframes = []
     sorted_pose_transforms = sort_pose_transforms(get_pose_transforms(context, arm_obj, act))
     duration = 0.0
+    frame_start = context.scene.frame_start
 
     for bone_id, time, pose_transform in sorted_pose_transforms:
         bone = arm_obj.data.bones[bone_id]
+        time = time - frame_start
 
         loc_mat = bone.matrix_local.copy()
         if bone.parent:
