@@ -28,6 +28,11 @@ def read_float32(fd, num=1, en='<'):
     return res if num > 1 else res[0]
 
 
+def read_uint16(fd, num=1, en='<'):
+    res = struct.unpack('%s%dH' % (en, num), fd.read(2 * num))
+    return res if num > 1 else res[0]
+
+
 def read_uint32(fd, num=1, en='<'):
     res = struct.unpack('%s%dI' % (en, num), fd.read(4 * num))
     return res if num > 1 else res[0]
@@ -64,6 +69,93 @@ def pack_rw_lib_id(rw_ver, maj_rev, min_rev, bin_ver):
     return 0xffff | (b << 16) | (n << 22) | (j << 26) | (v << 30)
 
 
+def read_keyframes_uncompressed(fd, keyframes_num):
+    keyframes = []
+    frame_offs = []
+    bone_id = -1
+
+    for kf_id in range(keyframes_num):
+        frame_offs.append(kf_id * 36)
+        time = read_float32(fd)
+        rot = read_float32(fd, 4)
+        rot = Quaternion((rot[3], rot[0], rot[1], rot[2]))
+        pos = Vector(read_float32(fd, 3))
+        prev_frame_off = read_uint32(fd)
+
+        if prev_frame_off & 0x3F000000:
+            bone_id = bone_id + 1 if time == 0.0 else 0
+        else:
+            prev_kf_id = frame_offs.index(prev_frame_off)
+            bone_id = keyframes[prev_kf_id].bone_id
+
+        keyframes.append(AnmKeyframe(time, bone_id, pos, rot))
+
+    return keyframes
+
+
+def read_keyframes_compressed(fd, keyframes_num):
+    keyframes = []
+    frame_offs = []
+    bone_id = -1
+
+    for kf_id in range(keyframes_num):
+        frame_offs.append(kf_id * 24)
+        time = read_float32(fd)
+        rot = read_float16(fd, 4)
+        rot = Quaternion((rot[3], rot[0], rot[1], rot[2]))
+        pos = Vector(read_float16(fd, 3))
+        prev_frame_off = read_uint32(fd)
+
+        if prev_frame_off & 0x3F000000:
+            bone_id = bone_id + 1 if time == 0.0 else 0
+        else:
+            prev_kf_id = frame_offs.index(prev_frame_off)
+            bone_id = keyframes[prev_kf_id].bone_id
+
+        keyframes.append(AnmKeyframe(time, bone_id, pos, rot))
+
+    offset = Vector(read_float32(fd, 3))
+    scalar = Vector(read_float32(fd, 3))
+    for kf in keyframes:
+        kf.pos *= scalar
+        kf.pos += offset
+
+    return keyframes
+
+
+def read_keyframes_climax(fd, keyframes_num):
+    keyframes = []
+    bone_id = -1
+
+    offset = Vector(read_float32(fd, 3))
+    scalar = Vector(read_float32(fd, 3))
+
+    for kf_id in range(keyframes_num):
+        prev_frame = read_uint32(fd)
+        time = read_float32(fd)
+
+        if prev_frame & 0x3F000000:
+            bone_id = bone_id + 1 if time == 0.0 else 0
+        else:
+            bone_id = keyframes[kf_id - prev_frame // 20].bone_id
+
+        keyframes.append(AnmKeyframe(time, bone_id, Vector(), Quaternion()))
+
+    for kf_id in range(keyframes_num):
+        compressed1 = read_uint32(fd)
+        compressed2 = read_uint16(fd)
+
+        qx = ((compressed1 >> 20) - 2048.0) / 2047.0
+        qy = (((compressed1 >> 8) & 0xFFF) - 2048.0) / 2047.0
+        qz = ((((compressed1 * 16) & 0xFFF) | (compressed2 >> 12)) - 2048.0) / 2047.0
+        qw = ((compressed2 & 0xFFF) - 2048.0 ) / 2047.0
+
+        keyframes[kf_id].pos = Vector(read_uint16(fd, 3)) / 65535.0 * scalar + offset
+        keyframes[kf_id].rot = Quaternion((qw, qx, qy, qz))
+
+    return keyframes
+
+
 @dataclass
 class AnmKeyframe:
     time: float
@@ -85,36 +177,12 @@ class AnmAction:
         duration = read_float32(fd)
 
         keyframes = []
-        frame_offs = []
-        bone_id = -1
-
-        for kf_id in range(keyframes_num):
-            time = read_float32(fd)
-            if keyframe_type == 1:
-                frame_offs.append(kf_id * 36)
-                rot = read_float32(fd, 4)
-                pos = Vector(read_float32(fd, 3))
-            else:
-                frame_offs.append(kf_id * 24)
-                rot = read_float16(fd, 4)
-                pos = Vector(read_float16(fd, 3))
-            rot = Quaternion((rot[3], rot[0], rot[1], rot[2]))
-            prev_frame_off = read_uint32(fd)
-
-            if prev_frame_off & 0x3F000000:
-                bone_id = bone_id + 1 if time == 0.0 else 0
-            else:
-                prev_kf_id = frame_offs.index(prev_frame_off)
-                bone_id = keyframes[prev_kf_id].bone_id
-
-            keyframes.append(AnmKeyframe(time, bone_id, pos, rot))
-
-        if keyframe_type == 2:
-            offset = Vector(read_float32(fd, 3))
-            scalar = Vector(read_float32(fd, 3))
-            for kf in keyframes:
-                kf.pos *= scalar
-                kf.pos += offset
+        if keyframe_type == 1:
+            keyframes = read_keyframes_uncompressed(fd, keyframes_num)
+        elif keyframe_type == 2:
+            keyframes = read_keyframes_compressed(fd, keyframes_num)
+        elif keyframe_type == 0x1103:
+            keyframes = read_keyframes_climax(fd, keyframes_num)
 
         return cls(version, flags, duration, keyframes)
 
