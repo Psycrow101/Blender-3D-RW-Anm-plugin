@@ -103,7 +103,7 @@ def sort_pose_transforms(pose_transforms):
     return sorted_pose_transforms
 
 
-def create_anm_action(context, arm_obj, act, fps):
+def create_anm_action(context, arm_obj, act, fps, keyframe_type):
     keyframes = []
     sorted_pose_transforms = sort_pose_transforms(get_pose_transforms(context, arm_obj, act))
     duration = 0.0
@@ -125,10 +125,10 @@ def create_anm_action(context, arm_obj, act, fps):
         if time > duration:
             duration = time
 
-    return AnmAction(ANM_ACTION_VERSION, 0, duration / fps, keyframes)
+    return AnmAction(ANM_ACTION_VERSION, keyframe_type, 0, duration / fps, keyframes)
 
 
-def save(context, filepath, fps, export_version):
+def save(context, filepath, fps, export_version, keyframe_type):
     arm_obj = context.view_layer.objects.active
     if not arm_obj or type(arm_obj.data) != bpy.types.Armature:
         context.window_manager.popup_menu(invalid_active_object, title='Error', icon='ERROR')
@@ -147,7 +147,7 @@ def save(context, filepath, fps, export_version):
         context.window_manager.popup_menu(no_tagged_bones, title='Error', icon='ERROR')
         return {'CANCELLED'}
 
-    anm_act = create_anm_action(context, arm_obj, act, fps)
+    anm_act = create_anm_action(context, arm_obj, act, fps, keyframe_type)
     anm = Anm([AnmChunk(ANM_CHUNK_ID, export_version, anm_act)])
     anm.save(filepath)
 

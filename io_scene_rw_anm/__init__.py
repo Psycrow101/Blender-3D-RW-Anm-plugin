@@ -1,8 +1,9 @@
 import bpy
 from bpy.props import (
-        StringProperty,
-        FloatProperty,
         CollectionProperty,
+        EnumProperty,
+        FloatProperty,
+        StringProperty,
         )
 from bpy_extras.io_utils import (
         ImportHelper,
@@ -14,7 +15,7 @@ from . anm import unpack_rw_lib_id, pack_rw_lib_id
 bl_info = {
     "name": "RenderWare Animation",
     "author": "Psycrow",
-    "version": (0, 2, 1),
+    "version": (0, 3, 0),
     "blender": (2, 81, 0),
     "location": "File > Import-Export",
     "description": "Import / Export RenderWare Animation (.anm)",
@@ -67,10 +68,19 @@ class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
     filter_glob: StringProperty(default="*.anm", options={'HIDDEN'})
     filename_ext = ".anm"
 
-    export_version: bpy.props.StringProperty(
+    export_version: StringProperty(
         maxlen=7,
         default="3.5.0.1",
         name="Version Export"
+    )
+
+    keyframe_type: EnumProperty(
+        name="Keyframe Type",
+        items=(
+            ("0x0001", "Uncompressed", "Uncompressed"),
+            ("0x0002", "Compressed", "Compressed"),
+            ("0x1103", "Climax", "Climax (0x1103)"),
+        )
     )
 
     fps: FloatProperty(
@@ -90,6 +100,7 @@ class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
 
         col = layout.column()
         col.alignment = 'CENTER'
+        col.prop(self, "keyframe_type")
         col.prop(self, "fps")
 
     def execute(self, context):
@@ -99,7 +110,7 @@ class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
             self.report({"ERROR_INVALID_INPUT"}, "Invalid RW Version")
             return {'CANCELLED'}
 
-        return export_rw_anm.save(context, self.filepath, self.fps, self.get_selected_rw_version())
+        return export_rw_anm.save(context, self.filepath, self.fps, self.get_selected_rw_version(), int(self.keyframe_type, 16))
 
     def invoke(self, context, event):
         arm_obj = context.view_layer.objects.active
