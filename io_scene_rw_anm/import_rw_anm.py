@@ -1,7 +1,10 @@
 import bpy
+
 from mathutils import Matrix
 from os import path
-from . anm import Anm
+
+from .types.anm import Anm
+from .types.ska import Ska
 
 POSEDATA_PREFIX = 'pose.bones["%s"].'
 
@@ -17,56 +20,66 @@ def set_keyframe(curves, frame, values):
         c.keyframe_points[-1].interpolation = 'LINEAR'
 
 
-def create_action(arm_obj, anm_act, fps):
+def translation_matrix(v):
+    return Matrix.Translation(v)
+
+
+def local_to_basis_matrix(local_matrix, global_matrix, parent_matrix):
+    return global_matrix.inverted() @ (parent_matrix @ local_matrix)
+
+
+def create_action(arm_obj, rw_animation, fps):
     act = bpy.data.actions.new('action')
     curves_loc, curves_rot = [], []
-    loc_mats, prev_rots = {}, {}
+    prev_rots = {}
 
-    for pose_bone in arm_obj.pose.bones:
-        g = act.groups.new(name=pose_bone.name)
-        cl = [act.fcurves.new(data_path=(POSEDATA_PREFIX % pose_bone.name) + 'location', index=i) for i in range(3)]
-        cr = [act.fcurves.new(data_path=(POSEDATA_PREFIX % pose_bone.name) + 'rotation_quaternion', index=i) for i in range(4)]
+    for bone in arm_obj.data.bones:
+        g = act.groups.new(name=bone.name)
+        cl = [act.fcurves.new(data_path=(POSEDATA_PREFIX % bone.name) + 'location', index=i) for i in range(3)]
+        cr = [act.fcurves.new(data_path=(POSEDATA_PREFIX % bone.name) + 'rotation_quaternion', index=i) for i in range(4)]
 
-        for c in cl:
-            c.group = g
-
-        for c in cr:
+        for c in cl + cr:
             c.group = g
 
         curves_loc.append(cl)
         curves_rot.append(cr)
+
+        pose_bone = arm_obj.pose.bones[bone.name]
         pose_bone.rotation_mode = 'QUATERNION'
         pose_bone.location = (0, 0, 0)
         pose_bone.rotation_quaternion = (1, 0, 0, 0)
 
-        bone = arm_obj.data.bones.get(pose_bone.name)
-        loc_mat = bone.matrix_local.copy()
-        if bone.parent:
-            loc_mat = bone.parent.matrix_local.inverted_safe() @ loc_mat
-        loc_mats[pose_bone] = loc_mat
-        prev_rots[pose_bone] = None
+        prev_rots[bone] = None
 
-    for kf in anm_act.keyframes:
-        if kf.bone_id >= len(arm_obj.pose.bones):
+    for kf in rw_animation.keyframes:
+        if kf.bone_id >= len(arm_obj.data.bones):
             continue
 
-        pose_bone = arm_obj.pose.bones[kf.bone_id]
+        bone = arm_obj.data.bones[kf.bone_id]
 
-        loc_mat = loc_mats[pose_bone]
-        loc_pos = loc_mat.to_translation()
-        loc_rot = loc_mat.to_quaternion()
+        rest_mat = bone.matrix_local
+        if bone.parent:
+            parent_mat = bone.parent.matrix_local
+            local_rot = (parent_mat.inverted_safe() @ rest_mat).to_quaternion()
+        else:
+            parent_mat = Matrix.Identity(4)
+            local_rot = rest_mat.to_quaternion()
 
-        rot = loc_rot.rotation_difference(kf.rot)
+        mat = translation_matrix(kf.pos)
+        mat_basis = local_to_basis_matrix(mat, rest_mat, parent_mat)
+        loc = mat_basis.to_translation()
 
-        prev_rot = prev_rots[pose_bone]
+        rot = local_rot.rotation_difference(kf.rot)
+
+        prev_rot = prev_rots[bone]
         if prev_rot:
             alt_rot = rot.copy()
             alt_rot.negate()
             if rot.rotation_difference(prev_rot).angle > alt_rot.rotation_difference(prev_rot).angle:
                 rot = alt_rot
-        prev_rots[pose_bone] = rot
+        prev_rots[bone] = rot
 
-        set_keyframe(curves_loc[kf.bone_id], kf.time * fps, kf.pos - loc_pos)
+        set_keyframe(curves_loc[kf.bone_id], kf.time * fps, loc)
         set_keyframe(curves_rot[kf.bone_id], kf.time * fps, rot)
 
     return act
@@ -78,8 +91,22 @@ def load(context, filepath, fps):
         context.window_manager.popup_menu(invalid_active_object, title='Error', icon='ERROR')
         return {'CANCELLED'}
 
-    anm = Anm.load(filepath)
-    if not anm.chunks:
+    rw_animations = []
+    rw_version = None
+
+    ext = path.splitext(filepath)[-1].lower()
+    if ext == ".anm":
+        anm = Anm.load(filepath)
+        if anm.chunks:
+            rw_animations = [chunk.animation for chunk in anm.chunks]
+            rw_version = anm.chunks[0].version
+
+    elif ext == ".ska":
+        ska = Ska.load(filepath)
+        rw_animations = [ska.animation]
+        rw_version = None
+
+    if not rw_animations:
         return {'CANCELLED'}
 
     animation_data = arm_obj.animation_data
@@ -89,12 +116,14 @@ def load(context, filepath, fps):
     bpy.ops.object.mode_set(mode='POSE')
 
     context.scene.frame_start = 0
-    for chunk in anm.chunks:
-        act = create_action(arm_obj, chunk.action, fps)
+    for anim in rw_animations:
+        act = create_action(arm_obj, anim, fps)
         act.name = path.basename(filepath)
-        act['dragonff_rw_version'] = chunk.version
         animation_data.action = act
-        context.scene.frame_end = int(chunk.action.duration * fps)
+        context.scene.frame_end = int(anim.duration * fps)
+
+        if rw_version is not None:
+            act['dragonff_rw_version'] = rw_version
 
     bpy.ops.object.mode_set(mode='OBJECT')
 

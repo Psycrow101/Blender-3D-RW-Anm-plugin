@@ -1,7 +1,12 @@
 import bpy
+
 from dataclasses import dataclass
-from mathutils import Quaternion, Vector
-from . anm import Anm, AnmChunk, AnmAction, AnmKeyframe, ANM_CHUNK_ID, ANM_ACTION_VERSION
+from mathutils import Matrix, Quaternion, Vector
+from os import path
+
+from .types.common import RWAnmChunk, AnmAnimation, AnmKeyframe
+from .types.anm import Anm, ANM_CHUNK_ID, ANM_ANIMATION_VERSION
+from .types.ska import Ska
 
 
 def invalid_active_object(self, context):
@@ -14,6 +19,10 @@ def missing_action(self, context):
 
 def no_tagged_bones(self, context):
     self.layout.label(text='No tagged bones in armature. To export animation, you must first import the dff model')
+
+
+def basis_to_local_matrix(basis_matrix, global_matrix, parent_matrix):
+    return parent_matrix.inverted() @ global_matrix @ basis_matrix
 
 
 def is_bone_taged(bone):
@@ -103,7 +112,7 @@ def sort_pose_transforms(pose_transforms):
     return sorted_pose_transforms
 
 
-def create_anm_action(context, arm_obj, act, fps, keyframe_type):
+def create_anm_animation(context, arm_obj, act, fps, keyframe_type):
     keyframes = []
     sorted_pose_transforms = sort_pose_transforms(get_pose_transforms(context, arm_obj, act))
     duration = 0.0
@@ -113,19 +122,22 @@ def create_anm_action(context, arm_obj, act, fps, keyframe_type):
         bone = arm_obj.data.bones[bone_id]
         time = time - frame_start
 
-        loc_mat = bone.matrix_local.copy()
+        rest_mat = bone.matrix_local
         if bone.parent:
-            loc_mat = bone.parent.matrix_local.inverted_safe() @ loc_mat
+            parent_mat = bone.parent.matrix_local
+        else:
+            parent_mat = Matrix.Identity(4)
 
-        kf_pos, kf_rot = pose_transform.pos, pose_transform.rot
-        kf_pos += loc_mat.to_translation()
-        kf_rot = loc_mat.inverted_safe().to_quaternion().rotation_difference(kf_rot)
+        basis_mat = Matrix.Translation(pose_transform.pos) @ pose_transform.rot.to_matrix().to_4x4()
+        loc_mat = basis_to_local_matrix(basis_mat, rest_mat, parent_mat)
+
+        kf_pos, kf_rot = loc_mat.to_translation(), loc_mat.to_quaternion()
 
         keyframes.append(AnmKeyframe(time / fps, bone_id, kf_pos, kf_rot))
         if time > duration:
             duration = time
 
-    return AnmAction(ANM_ACTION_VERSION, keyframe_type, 0, duration / fps, keyframes)
+    return AnmAnimation(ANM_ANIMATION_VERSION, keyframe_type, 0, duration / fps, keyframes)
 
 
 def save(context, filepath, fps, export_version, keyframe_type):
@@ -147,8 +159,13 @@ def save(context, filepath, fps, export_version, keyframe_type):
         context.window_manager.popup_menu(no_tagged_bones, title='Error', icon='ERROR')
         return {'CANCELLED'}
 
-    anm_act = create_anm_action(context, arm_obj, act, fps, keyframe_type)
-    anm = Anm([AnmChunk(ANM_CHUNK_ID, export_version, anm_act)])
+    anm_animation = create_anm_animation(context, arm_obj, act, fps, keyframe_type)
+
+    ext = path.splitext(filepath)[-1].lower()
+    if ext == ".ska":
+        anm = Ska(anm_animation)
+    else:
+        anm = Anm([RWAnmChunk(ANM_CHUNK_ID, export_version, anm_animation)])
     anm.save(filepath)
 
     return {'FINISHED'}

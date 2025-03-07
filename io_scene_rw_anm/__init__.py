@@ -10,7 +10,7 @@ from bpy_extras.io_utils import (
         ExportHelper,
         )
 from pathlib import Path
-from . anm import unpack_rw_lib_id, pack_rw_lib_id
+from .types.common import unpack_rw_lib_id, pack_rw_lib_id
 
 bl_info = {
     "name": "RenderWare Animation",
@@ -18,7 +18,7 @@ bl_info = {
     "version": (0, 3, 0),
     "blender": (2, 81, 0),
     "location": "File > Import-Export",
-    "description": "Import / Export RenderWare Animation (.anm)",
+    "description": "Import / Export RenderWare Animation (.anm, .ska)",
     "warning": "",
     "wiki_url": "",
     "support": 'COMMUNITY',
@@ -38,7 +38,7 @@ class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
     bl_label = "Import RenderWare Animation"
     bl_options = {'PRESET', 'UNDO'}
 
-    filter_glob: StringProperty(default="*.anm", options={'HIDDEN'})
+    filter_glob: StringProperty(default="*.anm;*.ska", options={'HIDDEN'})
     filename_ext = ".anm"
 
     fps: FloatProperty(
@@ -55,14 +55,14 @@ class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
         files_dir = Path(self.filepath)
         for selection in self.files:
             file_path = Path(files_dir.parent, selection.name)
-            if file_path.suffix.lower() == self.filename_ext:
+            if file_path.suffix.lower() in (".anm", ".ska"):
                 import_rw_anm.load(context, file_path, self.fps)
         return {'FINISHED'}
 
 
 class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
     bl_idname = "export_scene.renderware_anm"
-    bl_label = "Export RenderWare Animation"
+    bl_label = "Export RenderWare Animation (.anm)"
     bl_options = {'PRESET'}
 
     filter_glob: StringProperty(default="*.anm", options={'HIDDEN'})
@@ -140,19 +140,57 @@ class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
         return pack_rw_lib_id(*map(lambda c: int('0x%c' % c, 0), (ver[0], ver[2], ver[4], ver[6])))
 
 
+class ExportRenderWareSka(bpy.types.Operator, ExportHelper):
+    bl_idname = "export_scene.renderware_ska"
+    bl_label = "Export RenderWare Animation (.ska)"
+    bl_options = {'PRESET'}
+
+    filter_glob: StringProperty(default="*.ska", options={'HIDDEN'})
+    filename_ext = ".ska"
+
+    fps: FloatProperty(
+        name="FPS",
+        description="Value by which the keyframe time is divided",
+        default=30.0,
+    )
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column()
+        col.alignment = 'CENTER'
+        col.prop(self, "keyframe_type")
+        col.prop(self, "fps")
+
+    def execute(self, context):
+        from . import export_rw_anm
+
+        return export_rw_anm.save(context, self.filepath, self.fps, 0, 0)
+
+
+class ExportRenderWareChoice(bpy.types.Menu):
+    bl_label = "RenderWare Animation (.anm, .ska)"
+
+    def draw(self, context):
+            self.layout.operator(ExportRenderWareAnm.bl_idname,
+                                text="RenderWare Animation (.anm)")
+            self.layout.operator(ExportRenderWareSka.bl_idname,
+                                text="RenderWare Animation (.ska)")
+
+
 def menu_func_import(self, context):
     self.layout.operator(ImportRenderWareAnm.bl_idname,
-                         text="RenderWare Animation (.anm)")
+                         text="RenderWare Animation (.anm, .ska)")
 
 
 def menu_func_export(self, context):
-    self.layout.operator(ExportRenderWareAnm.bl_idname,
-                         text="RenderWare Animation (.anm)")
+    self.layout.menu("ExportRenderWareChoice", text=ExportRenderWareChoice.bl_label)
 
 
 classes = (
     ImportRenderWareAnm,
     ExportRenderWareAnm,
+    ExportRenderWareSka,
+    ExportRenderWareChoice,
 )
 
 
