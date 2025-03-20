@@ -79,6 +79,7 @@ class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
         items=(
             ("0x0001", "Uncompressed", "Uncompressed"),
             ("0x0002", "Compressed", "Compressed"),
+            ("0x0100", "Compressed Rotations (rotanm)", "Compressed Rotations"),
             ("0x1103", "Climax", "Climax (0x1103)"),
         )
     )
@@ -167,7 +168,7 @@ class ExportRenderWareSka(bpy.types.Operator, ExportHelper):
         return export_rw_anm.save(context, self.filepath, self.fps, 0, 0)
 
 
-class ExportRenderWareChoice(bpy.types.Menu):
+class OBJECT_MT_RWAnimExportChoice(bpy.types.Menu):
     bl_label = "RenderWare Animation (.anm, .ska)"
 
     def draw(self, context):
@@ -183,14 +184,14 @@ def menu_func_import(self, context):
 
 
 def menu_func_export(self, context):
-    self.layout.menu("ExportRenderWareChoice", text=ExportRenderWareChoice.bl_label)
+    self.layout.menu("OBJECT_MT_RWAnimExportChoice", text=OBJECT_MT_RWAnimExportChoice.bl_label)
 
 
 classes = (
     ImportRenderWareAnm,
     ExportRenderWareAnm,
     ExportRenderWareSka,
-    ExportRenderWareChoice,
+    OBJECT_MT_RWAnimExportChoice,
 )
 
 

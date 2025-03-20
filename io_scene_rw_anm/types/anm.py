@@ -9,9 +9,10 @@ from . common import *
 ANM_CHUNK_ID = 0x1b
 ANM_ANIMATION_VERSION = 0x100
 
-KEYFRAME_TYPE_UNCOMPRESSED = 1
-KEYFRAME_TYPE_COMPRESSED   = 2
-KEYFRAME_TYPE_CLIMAX       = 0x1103
+KEYFRAME_TYPE_UNCOMPRESSED   = 1
+KEYFRAME_TYPE_COMPRESSED     = 2
+KEYFRAME_TYPE_COMPRESSED_ROT = 0x100
+KEYFRAME_TYPE_CLIMAX         = 0x1103
 
 
 def calculate_linear_scale(data, unsigned=False):
@@ -81,6 +82,29 @@ def read_keyframes_compressed(fd, keyframes_num):
     for kf in keyframes:
         kf.pos *= pos_scale
         kf.pos += pos_offset
+
+    return keyframes
+
+
+def read_keyframes_compressed_rot(fd, keyframes_num):
+    keyframes = []
+    frame_offs = []
+    bone_id = -1
+
+    for kf_id in range(keyframes_num):
+        frame_offs.append(kf_id * 16)
+        time = read_float32(fd)
+        rot = read_int16(fd, 4)
+        rot = Quaternion((rot[3] / 32767, rot[0] / 32767, rot[1] / 32767, rot[2] / 32767))
+        prev_frame_off = read_uint32(fd)
+
+        if prev_frame_off & 0x3F000000:
+            bone_id = bone_id + 1 if time == 0.0 else 0
+        else:
+            prev_kf_id = frame_offs.index(prev_frame_off)
+            bone_id = keyframes[prev_kf_id].bone_id
+
+        keyframes.append(AnmKeyframe(time, bone_id, None, rot))
 
     return keyframes
 
@@ -158,6 +182,25 @@ def write_keyframes_compressed(fd, keyframes: List[AnmKeyframe]):
     write_float32(fd, pos_scale)
 
 
+def write_keyframes_compressed_rot(fd, keyframes: List[AnmKeyframe]):
+    prev_frame_offs = {}
+
+    for kf_id, kf in enumerate(keyframes):
+        write_float32(fd, kf.time)
+        write_int16(fd, (
+            int(kf.rot.x * 32767),
+            int(kf.rot.y * 32767),
+            int(kf.rot.z * 32767),
+            int(kf.rot.w * 32767))
+        )
+
+        if kf.bone_id not in prev_frame_offs:
+            write_uint32(fd, KEYFRAME_PARENT_NONE_OFFSET)
+        else:
+            write_uint32(fd, prev_frame_offs[kf.bone_id])
+        prev_frame_offs[kf.bone_id] = kf_id * 16
+
+
 def write_keyframes_climax(fd, keyframes: List[AnmKeyframe]):
     prev_frame_offs = {}
 
@@ -205,6 +248,8 @@ def read_anm_animation(fd):
         keyframes = read_keyframes_uncompressed(fd, keyframes_num)
     elif keyframe_type == KEYFRAME_TYPE_COMPRESSED:
         keyframes = read_keyframes_compressed(fd, keyframes_num)
+    elif keyframe_type == KEYFRAME_TYPE_COMPRESSED_ROT:
+        keyframes = read_keyframes_compressed_rot(fd, keyframes_num)
     elif keyframe_type == KEYFRAME_TYPE_CLIMAX:
         keyframes = read_keyframes_climax(fd, keyframes_num)
 
@@ -219,6 +264,8 @@ def write_anm_animation(fd, animation: AnmAnimation):
         write_keyframes_uncompressed(fd, animation.keyframes)
     elif animation.keyframe_type == KEYFRAME_TYPE_COMPRESSED:
         write_keyframes_compressed(fd, animation.keyframes)
+    elif animation.keyframe_type == KEYFRAME_TYPE_COMPRESSED_ROT:
+        write_keyframes_compressed_rot(fd, animation.keyframes)
     elif animation.keyframe_type == KEYFRAME_TYPE_CLIMAX:
         write_keyframes_climax(fd, animation.keyframes)
 

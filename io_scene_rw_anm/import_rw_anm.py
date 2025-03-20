@@ -65,9 +65,11 @@ def create_action(arm_obj, rw_animation, fps):
             parent_mat = Matrix.Identity(4)
             local_rot = rest_mat.to_quaternion()
 
-        mat = translation_matrix(kf.pos)
-        mat_basis = local_to_basis_matrix(mat, rest_mat, parent_mat)
-        loc = mat_basis.to_translation()
+        if kf.pos is not None:
+            mat = translation_matrix(kf.pos)
+            mat_basis = local_to_basis_matrix(mat, rest_mat, parent_mat)
+            loc = mat_basis.to_translation()
+            set_keyframe(curves_loc[kf.bone_id], kf.time * fps, loc)
 
         rot = local_rot.rotation_difference(kf.rot)
 
@@ -79,7 +81,6 @@ def create_action(arm_obj, rw_animation, fps):
                 rot = alt_rot
         prev_rots[bone] = rot
 
-        set_keyframe(curves_loc[kf.bone_id], kf.time * fps, loc)
         set_keyframe(curves_rot[kf.bone_id], kf.time * fps, rot)
 
     return act

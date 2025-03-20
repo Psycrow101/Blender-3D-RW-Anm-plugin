@@ -40,6 +40,11 @@ def read_float32(fd, num=1, en='<'):
     return res if num > 1 else res[0]
 
 
+def read_int16(fd, num=1, en='<'):
+    res = struct.unpack('%s%dh' % (en, num), fd.read(2 * num))
+    return res if num > 1 else res[0]
+
+
 def read_uint16(fd, num=1, en='<'):
     res = struct.unpack('%s%dH' % (en, num), fd.read(2 * num))
     return res if num > 1 else res[0]
@@ -59,6 +64,12 @@ def write_float16(fd, vals, en='<'):
 def write_float32(fd, vals, en='<'):
     data = vals if hasattr(vals, '__len__') else (vals, )
     data = struct.pack('%s%df' % (en, len(data)), *data)
+    fd.write(data)
+
+
+def write_int16(fd, vals, en='<'):
+    data = vals if hasattr(vals, '__len__') else (vals, )
+    data = struct.pack('%s%dh' % (en, len(data)), *data)
     fd.write(data)
 
 
