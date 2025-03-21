@@ -29,6 +29,10 @@ def encode_float16(value):
     return (sign << 15) | (exponent << 11) | mantissa
 
 
+def read_string(fd, size):
+    return fd.read(size).rstrip(b'\0').decode()
+
+
 def read_float16(fd, num=1, en='<'):
     res = struct.unpack('%s%dH' % (en, num), fd.read(2 * num))
     res = tuple(map(decode_float16, res))
@@ -37,6 +41,11 @@ def read_float16(fd, num=1, en='<'):
 
 def read_float32(fd, num=1, en='<'):
     res = struct.unpack('%s%df' % (en, num), fd.read(4 * num))
+    return res if num > 1 else res[0]
+
+
+def read_uint8(fd, num=1):
+    res = struct.unpack('%dB' % num, fd.read(num))
     return res if num > 1 else res[0]
 
 
@@ -64,6 +73,12 @@ def write_float16(fd, vals, en='<'):
 def write_float32(fd, vals, en='<'):
     data = vals if hasattr(vals, '__len__') else (vals, )
     data = struct.pack('%s%df' % (en, len(data)), *data)
+    fd.write(data)
+
+
+def write_uint8(fd, vals):
+    data = vals if hasattr(vals, '__len__') else (vals, )
+    data = struct.pack('%dB' % len(data), *data)
     fd.write(data)
 
 

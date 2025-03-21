@@ -96,16 +96,16 @@ def load(context, filepath, fps):
     rw_version = None
 
     ext = path.splitext(filepath)[-1].lower()
-    if ext == ".anm":
+    if ext == ".ska":
+        ska = Ska.load(filepath)
+        rw_animations = [ska.animation]
+        rw_version = None
+
+    else:
         anm = Anm.load(filepath)
         if anm.chunks:
             rw_animations = [chunk.animation for chunk in anm.chunks]
             rw_version = anm.chunks[0].version
-
-    elif ext == ".ska":
-        ska = Ska.load(filepath)
-        rw_animations = [ska.animation]
-        rw_version = None
 
     if not rw_animations:
         return {'CANCELLED'}

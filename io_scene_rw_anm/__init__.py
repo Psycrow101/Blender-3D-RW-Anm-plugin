@@ -38,7 +38,7 @@ class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
     bl_label = "Import RenderWare Animation"
     bl_options = {'PRESET', 'UNDO'}
 
-    filter_glob: StringProperty(default="*.anm;*.ska", options={'HIDDEN'})
+    filter_glob: StringProperty(default="*.*anm;*.ska", options={'HIDDEN'})
     filename_ext = ".anm"
 
     fps: FloatProperty(
@@ -55,7 +55,8 @@ class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
         files_dir = Path(self.filepath)
         for selection in self.files:
             file_path = Path(files_dir.parent, selection.name)
-            if file_path.suffix.lower() in (".anm", ".ska"):
+            file_ext = file_path.suffix.lower()
+            if file_ext == ".ska" or file_ext[-3:] == "anm":
                 import_rw_anm.load(context, file_path, self.fps)
         return {'FINISHED'}
 
@@ -120,6 +121,12 @@ class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
             if animation_data and animation_data.action and 'dragonff_rw_version' in animation_data.action:
                 rw_version = animation_data.action['dragonff_rw_version']
                 self.export_version = '%x.%x.%x.%x' % unpack_rw_lib_id(rw_version)
+
+        if not self.filepath:
+            if context.blend_data.filepath:
+                self.filepath = context.blend_data.filepath
+            else:
+                self.filepath = "untitled"
 
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}

@@ -11,6 +11,7 @@ ANM_ANIMATION_VERSION = 0x100
 
 KEYFRAME_TYPE_UNCOMPRESSED   = 1
 KEYFRAME_TYPE_COMPRESSED     = 2
+KEYFRAME_TYPE_TM             = 0x64
 KEYFRAME_TYPE_COMPRESSED_ROT = 0x100
 KEYFRAME_TYPE_CLIMAX         = 0x1103
 
@@ -82,6 +83,57 @@ def read_keyframes_compressed(fd, keyframes_num):
     for kf in keyframes:
         kf.pos *= pos_scale
         kf.pos += pos_offset
+
+    return keyframes
+
+
+def read_keyframes_tm(fd, keyframes_num):
+    keyframes = []
+    frame_offs = []
+    bone_id = -1
+    next_frame_off = 0
+
+    keyframes_with_pos_num = read_uint32(fd)
+    flag = read_uint8(fd)
+
+    if flag & 1:
+        start_bone_id = read_uint32(fd)
+        start_bone_name = read_string(fd, 64)
+        bone_id += start_bone_id
+    else:
+        start_bone_id = 0
+
+    pos_scale = Vector(read_float32(fd, 3))
+    pos_offset = Vector(read_float32(fd, 3))
+
+    for _ in range(keyframes_num):
+        frame_offs.append(next_frame_off)
+        kf_type = read_uint8(fd)
+        time = read_float32(fd)
+        rot = read_float16(fd, 4)
+        rot = Quaternion((rot[3], rot[0], rot[1], rot[2]))
+
+        if kf_type == 0:
+            pos = None
+            next_frame_off += 18
+
+        elif kf_type == 1:
+            pos = Vector(read_float16(fd, 3)) * pos_scale + pos_offset
+            next_frame_off += 24
+
+        elif kf_type == 2:
+            pos = read_float32(fd, 3)
+            next_frame_off += 30
+
+        prev_frame_off = read_uint32(fd)
+
+        if prev_frame_off == 0:
+            bone_id = bone_id + 1 if time == 0.0 else start_bone_id
+        else:
+            prev_kf_id = frame_offs.index(prev_frame_off)
+            bone_id = keyframes[prev_kf_id].bone_id
+
+        keyframes.append(AnmKeyframe(time, bone_id, pos, rot))
 
     return keyframes
 
@@ -248,6 +300,8 @@ def read_anm_animation(fd):
         keyframes = read_keyframes_uncompressed(fd, keyframes_num)
     elif keyframe_type == KEYFRAME_TYPE_COMPRESSED:
         keyframes = read_keyframes_compressed(fd, keyframes_num)
+    elif keyframe_type == KEYFRAME_TYPE_TM:
+        keyframes = read_keyframes_tm(fd, keyframes_num)
     elif keyframe_type == KEYFRAME_TYPE_COMPRESSED_ROT:
         keyframes = read_keyframes_compressed_rot(fd, keyframes_num)
     elif keyframe_type == KEYFRAME_TYPE_CLIMAX:
