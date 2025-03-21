@@ -1,7 +1,12 @@
 # io_scene_rw_anm
 
-This plugin for Blender 3D allows you to import and export RenderWare animations (`.anm`, `.ska`). Based on [Renderware-.anm-IO-Tool](https://github.com/Shadowth117/Renderware-.anm-IO-Tool). Primarily developed for Sonic Heroes game.
+This plugin for Blender 3D allows you to import and export RenderWare animations (`.anm`, `.ska`). Based on [Renderware-.anm-IO-Tool](https://github.com/Shadowth117/Renderware-.anm-IO-Tool)
 
+The following ANM formats are supported:
+* Common RenderWare `.anm`
+* TM Studios `.xanm` (import only)
+* TM Studios `.rotanm`
+* Climax Studios `.anm`
 
 ## How to import animation
 
