@@ -12,6 +12,12 @@ class AnmKeyframe:
     pos: Vector
     rot: Quaternion
 
+    def is_indexed_bones(self) -> bool:
+        return True
+
+    def is_pose_space(self) -> bool:
+        return False
+
 
 @dataclass
 class AnmAnimation:
@@ -46,3 +52,20 @@ def pack_rw_lib_id(rw_ver, maj_rev, min_rev, bin_ver):
     j = (ver >> 12) & 0xf
     v = (ver >> 16) & 0xf
     return 0xffff | (b << 16) | (n << 22) | (j << 26) | (v << 30)
+
+
+def calculate_linear_scale(data, unsigned=False):
+    if not data:
+        return 0, 1.0
+
+    min_val, max_val = min(data), max(data)
+    if max_val == min_val:
+        return 0, max_val
+
+    if unsigned:
+        offset = min_val
+        scale = max_val - offset
+    else:
+        offset = (min_val + max_val) / 2
+        scale = max((abs(min_val), abs(max_val))) - abs(offset)
+    return offset, scale

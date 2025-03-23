@@ -47,17 +47,40 @@ class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
         default=30.0,
     )
 
+    location_scale: FloatProperty(
+        name="Location Scale",
+        description="Bone location vector multiplier",
+        default=8.0,
+        step=100.0,
+        min=0.0,
+    )
+
     files: CollectionProperty(type=bpy.types.PropertyGroup)
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "fps")
+        layout.separator()
+
+        box = layout.box()
+        box.label(text="8ing")
+        box.prop(self, "location_scale")
 
     def execute(self, context):
         from . import import_rw_anm
+
+        options = {
+            "fps": self.fps,
+            "location_scale": self.location_scale,
+        }
 
         files_dir = Path(self.filepath)
         for selection in self.files:
             file_path = Path(files_dir.parent, selection.name)
             file_ext = file_path.suffix.lower()
             if file_ext == ".ska" or file_ext[-3:] == "anm":
-                import_rw_anm.load(context, file_path, self.fps)
+                import_rw_anm.load(context, file_path, options)
         return {'FINISHED'}
 
 

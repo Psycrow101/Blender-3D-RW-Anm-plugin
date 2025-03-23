@@ -3,7 +3,7 @@ import bpy
 from mathutils import Matrix
 from os import path
 
-from .types.anm import Anm
+from .types.anm import Anm, AnmAnimation
 from .types.ska import Ska
 
 POSEDATA_PREFIX = 'pose.bones["%s"].'
@@ -28,12 +28,16 @@ def local_to_basis_matrix(local_matrix, global_matrix, parent_matrix):
     return global_matrix.inverted() @ (parent_matrix @ local_matrix)
 
 
-def create_action(arm_obj, rw_animation, fps):
+def create_action(arm_obj, rw_animation: AnmAnimation, options):
+    fps = options["fps"]
+    location_scale = options["location_scale"]
+
     act = bpy.data.actions.new('action')
     curves_loc, curves_rot = [], []
     prev_rots = {}
+    bones_map = {}
 
-    for bone in arm_obj.data.bones:
+    for bone_id, bone in enumerate(arm_obj.data.bones):
         g = act.groups.new(name=bone.name)
         cl = [act.fcurves.new(data_path=(POSEDATA_PREFIX % bone.name) + 'location', index=i) for i in range(3)]
         cr = [act.fcurves.new(data_path=(POSEDATA_PREFIX % bone.name) + 'rotation_quaternion', index=i) for i in range(4)]
@@ -51,28 +55,45 @@ def create_action(arm_obj, rw_animation, fps):
 
         prev_rots[bone] = None
 
+        bone_tag = bone.get("bone_id")
+        if bone_tag is not None:
+            bones_map[bone_tag] = bone_id
+
     for kf in rw_animation.keyframes:
-        if kf.bone_id >= len(arm_obj.data.bones):
-            continue
 
-        bone = arm_obj.data.bones[kf.bone_id]
+        if kf.is_indexed_bones():
+            bone_id = kf.bone_id
+            if bone_id >= len(arm_obj.data.bones):
+                continue
 
-        rest_mat = bone.matrix_local
-        if bone.parent:
-            parent_mat = bone.parent.matrix_local
-            local_rot = (parent_mat.inverted_safe() @ rest_mat).to_quaternion()
         else:
-            parent_mat = Matrix.Identity(4)
-            local_rot = rest_mat.to_quaternion()
+            bone_id = bones_map[kf.bone_id]
 
-        if kf.pos is not None:
-            mat = translation_matrix(kf.pos)
-            mat_basis = local_to_basis_matrix(mat, rest_mat, parent_mat)
-            loc = mat_basis.to_translation()
-            set_keyframe(curves_loc[kf.bone_id], kf.time * fps, loc)
+        bone = arm_obj.data.bones[bone_id]
+        frame = kf.time * fps
+        pos, rot = None, None
 
-        rot = local_rot.rotation_difference(kf.rot)
+        if not kf.is_pose_space():
+            rest_mat = bone.matrix_local
+            if bone.parent:
+                parent_mat = bone.parent.matrix_local
+                local_rot = (parent_mat.inverted_safe() @ rest_mat).to_quaternion()
+            else:
+                parent_mat = Matrix.Identity(4)
+                local_rot = rest_mat.to_quaternion()
 
+            if kf.pos is not None:
+                mat = translation_matrix(kf.pos)
+                mat_basis = local_to_basis_matrix(mat, rest_mat, parent_mat)
+                pos = mat_basis.to_translation()
+
+            rot = local_rot.rotation_difference(kf.rot)
+
+        else:
+            pos = kf.pos * location_scale
+            rot = kf.rot
+
+        # Correction opposite direction of rotation
         prev_rot = prev_rots[bone]
         if prev_rot:
             alt_rot = rot.copy()
@@ -81,12 +102,15 @@ def create_action(arm_obj, rw_animation, fps):
                 rot = alt_rot
         prev_rots[bone] = rot
 
-        set_keyframe(curves_rot[kf.bone_id], kf.time * fps, rot)
+        if pos is not None:
+            set_keyframe(curves_loc[bone_id], frame, pos)
+
+        set_keyframe(curves_rot[bone_id], frame, rot)
 
     return act
 
 
-def load(context, filepath, fps):
+def load(context, filepath, options):
     arm_obj = context.view_layer.objects.active
     if not arm_obj or type(arm_obj.data) != bpy.types.Armature:
         context.window_manager.popup_menu(invalid_active_object, title='Error', icon='ERROR')
@@ -118,10 +142,10 @@ def load(context, filepath, fps):
 
     context.scene.frame_start = 0
     for anim in rw_animations:
-        act = create_action(arm_obj, anim, fps)
+        act = create_action(arm_obj, anim, options)
         act.name = path.basename(filepath)
         animation_data.action = act
-        context.scene.frame_end = int(anim.duration * fps)
+        context.scene.frame_end = int(anim.duration * options["fps"])
 
         if rw_version is not None:
             act['dragonff_rw_version'] = rw_version
