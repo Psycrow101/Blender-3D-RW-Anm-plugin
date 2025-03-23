@@ -153,6 +153,14 @@ def write_anm_animation(fd, animation: AnmAnimation):
         write_keyframes_climax(fd, animation.keyframes)
 
 
+def read_anm_chunk(fd) -> RWAnmChunk:
+    chunk_id, chunk_size, chunk_version = read_uint32(fd, 3)
+    if chunk_id == ANM_CHUNK_ID:
+        return RWAnmChunk(chunk_id, chunk_version, read_anm_animation(fd))
+    else:
+        fd.seek(chunk_size, SEEK_CUR)
+
+
 @dataclass
 class Anm:
     chunks: List[RWAnmChunk]
@@ -166,12 +174,9 @@ class Anm:
         chunks: List[RWAnmChunk] = []
 
         while fd.tell() < file_size:
-            chunk_id, chunk_size, chunk_version = read_uint32(fd, 3)
-            if chunk_id == ANM_CHUNK_ID:
-                anm_chunk = RWAnmChunk(chunk_id, chunk_version, read_anm_animation(fd))
+            anm_chunk = read_anm_chunk(fd)
+            if anm_chunk:
                 chunks.append(anm_chunk)
-            else:
-                fd.seek(chunk_size, SEEK_CUR)
 
         return cls(chunks)
 

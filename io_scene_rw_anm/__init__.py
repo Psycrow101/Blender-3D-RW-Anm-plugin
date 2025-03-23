@@ -38,7 +38,7 @@ class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
     bl_label = "Import RenderWare Animation"
     bl_options = {'PRESET', 'UNDO'}
 
-    filter_glob: StringProperty(default="*.*anm;*.ska", options={'HIDDEN'})
+    filter_glob: StringProperty(default="*.*anm;*.ska;*.tmo", options={'HIDDEN'})
     filename_ext = ".anm"
 
     fps: FloatProperty(
@@ -79,7 +79,7 @@ class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
         for selection in self.files:
             file_path = Path(files_dir.parent, selection.name)
             file_ext = file_path.suffix.lower()
-            if file_ext == ".ska" or file_ext[-3:] == "anm":
+            if file_ext in (".ska", ".tmo") or file_ext[-3:] == "anm":
                 import_rw_anm.load(context, file_path, options)
         return {'FINISHED'}
 
@@ -210,7 +210,7 @@ class OBJECT_MT_RWAnimExportChoice(bpy.types.Menu):
 
 def menu_func_import(self, context):
     self.layout.operator(ImportRenderWareAnm.bl_idname,
-                         text="RenderWare Animation (.anm, .ska)")
+                         text="RenderWare Animation (.anm, .ska, .tmo)")
 
 
 def menu_func_export(self, context):

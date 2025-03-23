@@ -5,6 +5,7 @@ from os import path
 
 from .types.anm import Anm, AnmAnimation
 from .types.ska import Ska
+from .types.tmo import Tmo
 
 POSEDATA_PREFIX = 'pose.bones["%s"].'
 
@@ -124,6 +125,12 @@ def load(context, filepath, options):
         ska = Ska.load(filepath)
         rw_animations = [ska.animation]
         rw_version = None
+
+    elif ext == ".tmo":
+        tmo = Tmo.load(filepath)
+        if tmo.chunks:
+            rw_animations = [chunk.animation for chunk in tmo.chunks]
+            rw_version = tmo.chunks[0].version
 
     else:
         anm = Anm.load(filepath)
