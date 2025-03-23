@@ -4,6 +4,7 @@ This plugin for Blender 3D allows you to import and export RenderWare animations
 
 The following ANM formats are supported:
 * Common RenderWare `.anm`
+* 8ing `.tmo` (import only)
 * TM Studios `.xanm` (import only)
 * TM Studios `.rotanm`
 * Climax Studios `.anm`
