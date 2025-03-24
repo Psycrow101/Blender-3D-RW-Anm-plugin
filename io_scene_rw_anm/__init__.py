@@ -10,6 +10,7 @@ from bpy_extras.io_utils import (
         ExportHelper,
         )
 from pathlib import Path
+from .reporter import Reporter
 from .types.common import unpack_rw_lib_id, pack_rw_lib_id
 
 bl_info = {
@@ -70,17 +71,27 @@ class ImportRenderWareAnm(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         from . import import_rw_anm
 
+        reporter = Reporter("Import Report")
+
         options = {
             "fps": self.fps,
             "location_scale": self.location_scale,
         }
+
+        arm_obj = context.view_layer.objects.active
+        if not arm_obj or type(arm_obj.data) != bpy.types.Armature:
+            reporter.error("You need to select the armature to import animation")
+            reporter.show()
+            return {'CANCELLED'}
 
         files_dir = Path(self.filepath)
         for selection in self.files:
             file_path = Path(files_dir.parent, selection.name)
             file_ext = file_path.suffix.lower()
             if file_ext in (".ska", ".tmo") or file_ext[-3:] == "anm":
-                import_rw_anm.load(context, file_path, options)
+                import_rw_anm.load(context, file_path, options, reporter)
+
+        reporter.show()
         return {'FINISHED'}
 
 
@@ -131,11 +142,21 @@ class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
     def execute(self, context):
         from . import export_rw_anm
 
+        reporter = Reporter("Export Report")
+
         if not self.verify_rw_version():
             self.report({"ERROR_INVALID_INPUT"}, "Invalid RW Version")
             return {'CANCELLED'}
 
-        return export_rw_anm.save(context, self.filepath, self.fps, self.get_selected_rw_version(), int(self.keyframe_type, 16))
+        options = {
+            "fps": self.fps,
+            "rw_version": self.get_selected_rw_version(),
+            "keyframe_type": int(self.keyframe_type, 16),
+        }
+
+        res = export_rw_anm.save(context, self.filepath, options, reporter)
+        reporter.show()
+        return res
 
     def invoke(self, context, event):
         arm_obj = context.view_layer.objects.active
@@ -195,7 +216,17 @@ class ExportRenderWareSka(bpy.types.Operator, ExportHelper):
     def execute(self, context):
         from . import export_rw_anm
 
-        return export_rw_anm.save(context, self.filepath, self.fps, 0, 0)
+        reporter = Reporter("Export Report")
+
+        options = {
+            "fps": self.fps,
+            "rw_version": 0,
+            "keyframe_type": 0,
+        }
+
+        res = export_rw_anm.save(context, self.filepath, options, reporter)
+        reporter.show()
+        return res
 
 
 class OBJECT_MT_RWAnimExportChoice(bpy.types.Menu):

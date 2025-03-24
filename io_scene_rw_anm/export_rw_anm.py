@@ -9,18 +9,6 @@ from .types.anm import Anm, ANM_CHUNK_ID, ANM_ANIMATION_VERSION
 from .types.ska import Ska
 
 
-def invalid_active_object(self, context):
-    self.layout.label(text='You need to select the armature to export animation')
-
-
-def missing_action(self, context):
-    self.layout.label(text='No action for active armature. Nothing to export')
-
-
-def no_tagged_bones(self, context):
-    self.layout.label(text='No tagged bones in armature. To export animation, you must first import the dff model')
-
-
 def basis_to_local_matrix(basis_matrix, global_matrix, parent_matrix):
     return parent_matrix.inverted() @ global_matrix @ basis_matrix
 
@@ -140,10 +128,10 @@ def create_anm_animation(context, arm_obj, act, fps, keyframe_type):
     return AnmAnimation(ANM_ANIMATION_VERSION, keyframe_type, 0, duration / fps, keyframes)
 
 
-def save(context, filepath, fps, export_version, keyframe_type):
+def save(context, filepath, options, reporter):
     arm_obj = context.view_layer.objects.active
     if not arm_obj or type(arm_obj.data) != bpy.types.Armature:
-        context.window_manager.popup_menu(invalid_active_object, title='Error', icon='ERROR')
+        reporter.error("You need to select the armature to export animation")
         return {'CANCELLED'}
 
     act = None
@@ -152,20 +140,22 @@ def save(context, filepath, fps, export_version, keyframe_type):
         act = animation_data.action
 
     if not act:
-        context.window_manager.popup_menu(missing_action, title='Error', icon='ERROR')
+        reporter.error("No action for active armature. Nothing to export")
         return {'CANCELLED'}
 
     if not any(is_bone_taged(bone) for bone in arm_obj.data.bones):
-        context.window_manager.popup_menu(no_tagged_bones, title='Error', icon='ERROR')
+        reporter.error("No tagged bones in armature. To export animation, you must first import the dff model or set 'bone_id' property")
         return {'CANCELLED'}
 
-    anm_animation = create_anm_animation(context, arm_obj, act, fps, keyframe_type)
+    anm_animation = create_anm_animation(context, arm_obj, act, options["fps"], options["keyframe_type"])
 
     ext = path.splitext(filepath)[-1].lower()
     if ext == ".ska":
         anm = Ska(anm_animation)
     else:
-        anm = Anm([RWAnmChunk(ANM_CHUNK_ID, export_version, anm_animation)])
+        anm = Anm([RWAnmChunk(ANM_CHUNK_ID, options["rw_version"], anm_animation)])
     anm.save(filepath)
+
+    reporter.exported_actions_num += 1
 
     return {'FINISHED'}

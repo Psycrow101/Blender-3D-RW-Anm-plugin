@@ -10,10 +10,6 @@ from .types.tmo import Tmo
 POSEDATA_PREFIX = 'pose.bones["%s"].'
 
 
-def invalid_active_object(self, context):
-    self.layout.label(text='You need to select the armature to import animation')
-
-
 def set_keyframe(curves, frame, values):
     for i, c in enumerate(curves):
         c.keyframe_points.add(1)
@@ -29,14 +25,17 @@ def local_to_basis_matrix(local_matrix, global_matrix, parent_matrix):
     return global_matrix.inverted() @ (parent_matrix @ local_matrix)
 
 
-def create_action(arm_obj, rw_animation: AnmAnimation, options):
+def create_action(act_name, arm_obj, rw_animation: AnmAnimation, options, reporter):
     fps = options["fps"]
     location_scale = options["location_scale"]
 
-    act = bpy.data.actions.new('action')
+    act = bpy.data.actions.new(act_name)
     curves_loc, curves_rot = [], []
     prev_rots = {}
     bones_map = {}
+
+    missing_bones = set()
+    need_bones_num = 0
 
     for bone_id, bone in enumerate(arm_obj.data.bones):
         g = act.groups.new(name=bone.name)
@@ -65,10 +64,14 @@ def create_action(arm_obj, rw_animation: AnmAnimation, options):
         if kf.is_indexed_bones():
             bone_id = kf.bone_id
             if bone_id >= len(arm_obj.data.bones):
+                need_bones_num = max(need_bones_num, bone_id + 1 - len(arm_obj.data.bones))
                 continue
 
         else:
-            bone_id = bones_map[kf.bone_id]
+            bone_id = bones_map.get(kf.bone_id)
+            if bone_id is None:
+                missing_bones.add(kf.bone_id)
+                continue
 
         bone = arm_obj.data.bones[bone_id]
         frame = kf.time * fps
@@ -108,14 +111,19 @@ def create_action(arm_obj, rw_animation: AnmAnimation, options):
 
         set_keyframe(curves_rot[bone_id], frame, rot)
 
+    if need_bones_num:
+        reporter.warning("The armature is missing %d bones for action" % need_bones_num, act.name)
+
+    if missing_bones:
+        reporter.warning("No bones were found with ID:", ", ".join(str(idx) for idx in missing_bones), "for action", act.name)
+
     return act
 
 
-def load(context, filepath, options):
+def load(context, filepath, options, reporter):
     arm_obj = context.view_layer.objects.active
     if not arm_obj or type(arm_obj.data) != bpy.types.Armature:
-        context.window_manager.popup_menu(invalid_active_object, title='Error', icon='ERROR')
-        return {'CANCELLED'}
+        return
 
     rw_animations = []
     rw_version = None
@@ -139,7 +147,7 @@ def load(context, filepath, options):
             rw_version = anm.chunks[0].version
 
     if not rw_animations:
-        return {'CANCELLED'}
+        return
 
     animation_data = arm_obj.animation_data
     if not animation_data:
@@ -149,8 +157,7 @@ def load(context, filepath, options):
 
     context.scene.frame_start = 0
     for anim in rw_animations:
-        act = create_action(arm_obj, anim, options)
-        act.name = path.basename(filepath)
+        act = create_action(path.basename(filepath), arm_obj, anim, options, reporter)
         animation_data.action = act
         context.scene.frame_end = int(anim.duration * options["fps"])
 
@@ -159,4 +166,4 @@ def load(context, filepath, options):
 
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    return {'FINISHED'}
+    reporter.imported_actions_num += len(rw_animations)
