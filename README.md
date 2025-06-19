@@ -8,6 +8,7 @@ The following ANM formats are supported:
 * TM Studios `.xanm` (import only)
 * TM Studios `.rotanm`
 * Climax Studios `.anm`
+* AKI Corporation `.anm` (import only)
 
 ## How to import animation
 

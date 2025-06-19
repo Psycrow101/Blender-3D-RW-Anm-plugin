@@ -1,8 +1,8 @@
 from mathutils import Quaternion, Vector
 from typing import List
 
-from . binary_utils import *
-from . common import *
+from .. binary_utils import *
+from .. common import *
 
 
 def read_keyframes_climax(fd, keyframes_num) -> List[AnmKeyframe]:

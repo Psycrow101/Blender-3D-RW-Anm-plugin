@@ -16,7 +16,7 @@ from .types.common import unpack_rw_lib_id, pack_rw_lib_id
 bl_info = {
     "name": "RenderWare Animation",
     "author": "Psycrow",
-    "version": (0, 4, 1),
+    "version": (0, 4, 2),
     "blender": (2, 81, 0),
     "location": "File > Import-Export",
     "description": "Import / Export RenderWare Animation (.anm, .ska)",
@@ -114,7 +114,7 @@ class ExportRenderWareAnm(bpy.types.Operator, ExportHelper):
         items=(
             ("0x0001", "Uncompressed", "Uncompressed"),
             ("0x0002", "Compressed", "Compressed"),
-            ("0x0100", "Compressed Rotations (rotanm)", "Compressed Rotations"),
+            ("0x0100", "TM Compressed Rotations (rotanm)", "TM Compressed Rotations (0x100)"),
             ("0x1103", "Climax", "Climax (0x1103)"),
         )
     )

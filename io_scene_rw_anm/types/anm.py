@@ -5,19 +5,14 @@ from typing import List
 
 from . binary_utils import *
 from . common import *
-from . eighting import *
-from . climax import *
-from . trashmasters import *
+
+from . vendors.aki import *
+from . vendors.eighting import *
+from . vendors.climax import *
+from . vendors.trashmasters import *
 
 ANM_CHUNK_ID = 0x1b
 ANM_ANIMATION_VERSION = 0x100
-
-KEYFRAME_TYPE_UNCOMPRESSED   = 1
-KEYFRAME_TYPE_COMPRESSED     = 2
-KEYFRAME_TYPE_TM             = 0x64
-KEYFRAME_TYPE_COMPRESSED_ROT = 0x100
-KEYFRAME_TYPE_8ING           = 0x400
-KEYFRAME_TYPE_CLIMAX         = 0x1103
 
 
 def read_keyframes_uncompressed(fd, keyframes_num) -> List[AnmKeyframe]:
@@ -119,22 +114,24 @@ def read_anm_animation(fd) -> AnmAnimation:
     duration = read_float32(fd)
     keyframes: List[AnmKeyframe] = []
 
-    # RW common
-    if keyframe_type == KEYFRAME_TYPE_UNCOMPRESSED:
-        keyframes = read_keyframes_uncompressed(fd, keyframes_num)
-    elif keyframe_type == KEYFRAME_TYPE_COMPRESSED:
-        keyframes = read_keyframes_compressed(fd, keyframes_num)
-    # TrashMasters (TM Studios)
-    elif keyframe_type == KEYFRAME_TYPE_TM:
-        keyframes = read_keyframes_tm(fd, keyframes_num)
-    elif keyframe_type == KEYFRAME_TYPE_COMPRESSED_ROT:
-        keyframes = read_keyframes_compressed_rot(fd, keyframes_num)
-    # 8ing
-    elif keyframe_type == KEYFRAME_TYPE_8ING:
-        keyframes = read_keyframes_8ing(fd, keyframes_num)
-    # Climax Studios
-    elif keyframe_type == KEYFRAME_TYPE_CLIMAX:
-        keyframes = read_keyframes_climax(fd, keyframes_num)
+    reader_func = {
+        # RW common
+        KeyframeType.UNCOMPRESSED: read_keyframes_uncompressed,
+        KeyframeType.COMPRESSED: read_keyframes_compressed,
+        # AKI
+        KeyframeType.AKI_COMPRESSED_ROT: read_keyframes_aki_compressed_rot,
+        KeyframeType.AKI_COMPRESSED_POS: read_keyframes_aki_compressed_pos,
+        # TrashMasters (TM Studios)
+        KeyframeType.TM: read_keyframes_tm,
+        KeyframeType.TM_COMPRESSED_ROT: read_keyframes_tm_compressed_rot,
+        # 8ing
+        KeyframeType.EIGHTING: read_keyframes_8ing,
+        # Climax Studios
+        KeyframeType.CLIMAX: read_keyframes_climax,
+    }.get(keyframe_type)
+
+    if reader_func:
+        keyframes = reader_func(fd, keyframes_num)
 
     return AnmAnimation(version, keyframe_type, flags, duration, keyframes)
 
@@ -143,14 +140,17 @@ def write_anm_animation(fd, animation: AnmAnimation):
     write_uint32(fd, (animation.version, animation.keyframe_type, len(animation.keyframes), animation.flags))
     write_float32(fd, animation.duration)
 
-    if animation.keyframe_type == KEYFRAME_TYPE_UNCOMPRESSED:
-        write_keyframes_uncompressed(fd, animation.keyframes)
-    elif animation.keyframe_type == KEYFRAME_TYPE_COMPRESSED:
-        write_keyframes_compressed(fd, animation.keyframes)
-    elif animation.keyframe_type == KEYFRAME_TYPE_COMPRESSED_ROT:
-        write_keyframes_compressed_rot(fd, animation.keyframes)
-    elif animation.keyframe_type == KEYFRAME_TYPE_CLIMAX:
-        write_keyframes_climax(fd, animation.keyframes)
+    writer_func = {
+        # RW common
+        KeyframeType.UNCOMPRESSED: write_keyframes_uncompressed,
+        KeyframeType.COMPRESSED: write_keyframes_compressed,
+        # TrashMasters (TM Studios)
+        KeyframeType.TM_COMPRESSED_ROT: write_keyframes_tm_compressed_rot,
+        # Climax Studios
+        KeyframeType.CLIMAX: write_keyframes_climax,
+    }[animation.keyframe_type]
+
+    writer_func(fd, animation.keyframes)
 
 
 def read_anm_chunk(fd) -> RWAnmChunk:

@@ -91,25 +91,27 @@ def create_action(act_name, arm_obj, rw_animation: AnmAnimation, options, report
                 mat_basis = local_to_basis_matrix(mat, rest_mat, parent_mat)
                 pos = mat_basis.to_translation()
 
-            rot = local_rot.rotation_difference(kf.rot)
+            if kf.rot is not None:
+                rot = local_rot.rotation_difference(kf.rot)
 
         else:
             pos = kf.pos * location_scale
             rot = kf.rot
 
-        # Correction opposite direction of rotation
-        prev_rot = prev_rots[bone]
-        if prev_rot:
-            alt_rot = rot.copy()
-            alt_rot.negate()
-            if rot.rotation_difference(prev_rot).angle > alt_rot.rotation_difference(prev_rot).angle:
-                rot = alt_rot
-        prev_rots[bone] = rot
-
         if pos is not None:
             set_keyframe(curves_loc[bone_id], frame, pos)
 
-        set_keyframe(curves_rot[bone_id], frame, rot)
+        if rot is not None:
+            # Correction opposite direction of rotation
+            prev_rot = prev_rots[bone]
+            if prev_rot:
+                alt_rot = rot.copy()
+                alt_rot.negate()
+                if rot.rotation_difference(prev_rot).angle > alt_rot.rotation_difference(prev_rot).angle:
+                    rot = alt_rot
+            prev_rots[bone] = rot
+
+            set_keyframe(curves_rot[bone_id], frame, rot)
 
     if need_bones_num:
         reporter.warning("The armature is missing %d bones for action" % need_bones_num, act.name)
@@ -143,7 +145,21 @@ def load(context, filepath, options, reporter):
     else:
         anm = Anm.load(filepath)
         if anm.chunks:
-            rw_animations = [chunk.animation for chunk in anm.chunks]
+            chunk_idx, chunks_num = 0, len(anm.chunks)
+            while chunk_idx < chunks_num:
+                next_chunk_idx = chunk_idx + 1
+                rw_anim = anm.chunks[chunk_idx].animation
+
+                if next_chunk_idx < chunks_num:
+                    next_rw_anim = anm.chunks[next_chunk_idx].animation
+
+                    if rw_anim.is_mergable_with(next_rw_anim):
+                        rw_anim.merge_with(next_rw_anim)
+                        next_chunk_idx += 1
+
+                rw_animations.append(rw_anim)
+                chunk_idx = next_chunk_idx
+
             rw_version = anm.chunks[0].version
 
     if not rw_animations:

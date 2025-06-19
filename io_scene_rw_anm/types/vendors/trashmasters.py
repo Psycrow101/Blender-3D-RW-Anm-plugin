@@ -1,8 +1,8 @@
 from mathutils import Quaternion, Vector
 from typing import List
 
-from . binary_utils import *
-from . common import *
+from .. binary_utils import *
+from .. common import *
 
 
 def read_keyframes_tm(fd, keyframes_num) -> List[AnmKeyframe]:
@@ -56,7 +56,7 @@ def read_keyframes_tm(fd, keyframes_num) -> List[AnmKeyframe]:
     return keyframes
 
 
-def read_keyframes_compressed_rot(fd, keyframes_num) -> List[AnmKeyframe]:
+def read_keyframes_tm_compressed_rot(fd, keyframes_num) -> List[AnmKeyframe]:
     keyframes: List[AnmKeyframe] = []
     frame_offs = []
     bone_id = -1
@@ -79,7 +79,7 @@ def read_keyframes_compressed_rot(fd, keyframes_num) -> List[AnmKeyframe]:
     return keyframes
 
 
-def write_keyframes_compressed_rot(fd, keyframes: List[AnmKeyframe]):
+def write_keyframes_tm_compressed_rot(fd, keyframes: List[AnmKeyframe]):
     prev_frame_offs = {}
 
     for kf_id, kf in enumerate(keyframes):
