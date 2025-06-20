@@ -54,6 +54,8 @@ class AnmAnimation:
             else:
                 self.keyframes.append(other_kf)
 
+        self.keyframes.sort(key=lambda kf: (kf.time, kf.bone_id))
+
 
 @dataclass
 class RWAnmChunk:
